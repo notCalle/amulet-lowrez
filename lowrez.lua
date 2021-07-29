@@ -49,64 +49,50 @@
 -- SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 local lowrez = ...
-table.merge(lowrez, {
-  __index = lowrez,
+
+local _default = {
   width = 64,
   height = 64,
-  scale = 8,
-  clear_color = vec4(0,0,0,1),
-  show_perf_stats = false
-})
+  scale = 8
+}
 
---- Create a new lowrez configuration
-function lowrez:new(...)
-  return setmetatable(... or {}, self)
+local window = {}
+
+function window:new(...)
+  local opts = table.shallow_copy(_default)
+  table.merge(opts, ... or {})
+
+  local new = { scale = opts.scale }
+
+  opts.physical_size = vec2(opts.width, opts.height) * opts.scale
+  opts.scale = nil
+  new[window] = am.window(opts)
+
+  return setmetatable(new, self)
 end
 
-local _window
---- Create the singleton window
-function lowrez:window(...)
-  if _window then return _window end
-
-  local opts = ... or {}
-  table.merge(opts,{
-    width = self.width * self.scale,
-    height = self.height * self.scale
-  })
-  _window = am.window(opts)
-  return _window
+function window:__index(k)
+  local f = rawget(window, "__get_" .. k)
+  return f and f(self) or self[window][k]
 end
 
---- Load and activate a scene graph from a module
-function lowrez:load(name)
-  local module = require(name)
-
-  if module.init then module:init(self) end
-  self:activate(module.scene)
+function window:__newindex(k, v)
+  local f = rawget(window, "__set_" .. k)
+  if f then
+    f(self, v)
+  else
+    self[window][k] = v
+  end
 end
 
---- Activate a scene graph
-function lowrez:activate(...)
-  local window = self:window()
-
-  self.scene = am.group(...)
-  window.scene = am.group{
-    am.postprocess(self)^am.scale(self.scale)
-    ^ self.scene
-    ,
-    am.translate(vec2(window.left-28,window.top+12))
-    ^ am.text("fps",vec4(0,1,0,1),"left","top")
-      :action(function(node)
-        if self.show_perf_stats then
-          node.text = table.tostring(am.perf_stats())
-          node.hidden = false
-        else
-          node.hidden = true
-        end
-      end)
-  }
+function window:__get_scene()
+  return self[window].scene'lowrez'
 end
 
-function lowrez:__call(tag)
-  return self.scene(tag)
+function window:__set_scene(scene)
+  self[window].scene = am.postprocess(self[window]) ^ scene:tag'lowrez'
+end
+
+function lowrez.window(...)
+  return window:new(...)
 end

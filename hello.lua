@@ -1,6 +1,6 @@
 local hello = ...
 
-hello.scene = {
+hello.scene = am.group{
   am.circle(vec2(0,0), 32, vec4(0,.5,0,1))
   ,
   am.rotate(0):action(function(node)
